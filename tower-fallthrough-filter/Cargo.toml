@@ -1,0 +1,22 @@
+[package]
+name = "tower-fallthrough-filter"
+description = "A Tower middleware that gives controll to a defined service if the filter matches and otherwise falls through to the inner service."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+authors = ["32byte <xlebedenko@gmail.com>"]
+homepage = "https://github.com/32byte/htmx-server"
+documentation = "https://docs.rs/tower-fallthrough-filter"
+repository = "https://github.com/32byte/htmx-server"
+readme = "README.md"
+keywords = ["tower", "middleware", "filter", "fallthrough"]
+categories = ["asynchronous", "network-programming"]
+
+[dependencies]
+futures = "0.3.30"
+tower = "0.4.13"
+
+[dev-dependencies]
+axum = "0.7.4"
+axum-test = "14.3.1"
+tokio = { version = "1.36.0", features = ["full"] }
