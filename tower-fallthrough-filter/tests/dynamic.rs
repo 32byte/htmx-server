@@ -8,7 +8,7 @@ use axum_test::TestServer;
 use futures::future::{ready, Ready};
 use tower::Service;
 
-use tower_fallthrough_filter::*;
+use tower_fallthrough_filter::{Filter, FilterLayer};
 
 #[derive(Debug)]
 struct TestService(String);
