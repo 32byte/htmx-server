@@ -72,3 +72,56 @@ async fn should_dynamically_filter() {
 
     assert_eq!(text, "a");
 }
+
+#[cfg(feature = "async")]
+mod async_tests {
+    use axum::{extract::Request, routing::get, Router};
+    use axum_test::TestServer;
+    use futures::future::BoxFuture;
+    use tower_fallthrough_filter::{AsyncFilter, AsyncFilterLayer};
+
+    use crate::TestService;
+
+    #[derive(Debug, Clone)]
+    struct AsyncDynamicFilter;
+
+    impl AsyncFilter<Request> for AsyncDynamicFilter {
+        type Future = BoxFuture<'static, bool>;
+
+        fn matches(&self, req: &Request) -> Self::Future {
+            let matches = req.uri().path().contains("filter");
+            Box::pin(async move { matches })
+        }
+    }
+
+    #[tokio::test]
+    async fn should_dynamically_filter() {
+        let service_a = TestService("a".into());
+
+        let filter = AsyncDynamicFilter;
+        let filter_layer = AsyncFilterLayer::new(filter, service_a);
+
+        let app = Router::<()>::new()
+            .route("/test", get(move || async { "b" }))
+            .route("/filter", get(move || async { "c" }))
+            .route("/123-filter-asdf", get(move || async { "d" }))
+            .layer(filter_layer);
+
+        let server = TestServer::new(app).unwrap();
+
+        let res = server.get("/test").await;
+        let text = res.text();
+
+        assert_eq!(text, "b");
+
+        let res = server.get("/filter").await;
+        let text = res.text();
+
+        assert_eq!(text, "a");
+
+        let res = server.get("/123-filter-asdf").await;
+        let text = res.text();
+
+        assert_eq!(text, "a");
+    }
+}

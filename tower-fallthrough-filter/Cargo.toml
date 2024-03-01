@@ -20,3 +20,12 @@ tower = "0.4.13"
 axum = "0.7.4"
 axum-test = "14.3.1"
 tokio = { version = "1.36.0", features = ["full"] }
+
+[features]
+default = []
+async = []
+
+[[example]]
+name = "axum-render-layer-async"
+path = "examples/axum-render-layer-async.rs"
+required-features = [ "async" ]

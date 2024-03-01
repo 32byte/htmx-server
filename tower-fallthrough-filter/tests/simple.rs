@@ -79,3 +79,64 @@ async fn should_fall_through() {
 
     assert_eq!(text, "b");
 }
+
+#[cfg(feature = "async")]
+mod async_tests {
+    use axum::{routing::get, Router};
+    use axum_test::TestServer;
+    use futures::future::BoxFuture;
+
+    use tower_fallthrough_filter::{AsyncFilter, AsyncFilterLayer};
+
+    use crate::TestService;
+
+    #[derive(Debug, Clone)]
+    struct TestFilter(bool);
+
+    impl<T> AsyncFilter<T> for TestFilter {
+        type Future = BoxFuture<'static, bool>;
+
+        fn matches(&self, _: &T) -> Self::Future {
+            let matches = self.0;
+            Box::pin(async move { matches })
+        }
+    }
+
+    #[tokio::test]
+    async fn should_allow() {
+        let service_a = TestService("a".into());
+
+        let filter = TestFilter(true);
+        let filter_layer = AsyncFilterLayer::new(filter, service_a);
+
+        let app = Router::<()>::new()
+            .route("/test", get(move || async { "b" }))
+            .layer(filter_layer);
+
+        let server = TestServer::new(app).unwrap();
+
+        let res = server.get("/test").await;
+        let text = res.text();
+
+        assert_eq!(text, "a");
+    }
+
+    #[tokio::test]
+    async fn should_fall_through() {
+        let service_a = TestService("a".into());
+
+        let filter = TestFilter(false);
+        let filter_layer = AsyncFilterLayer::new(filter, service_a);
+
+        let app = Router::<()>::new()
+            .route("/test", get(move || async { "b" }))
+            .layer(filter_layer);
+
+        let server = TestServer::new(app).unwrap();
+
+        let res = server.get("/test").await;
+        let text = res.text();
+
+        assert_eq!(text, "b");
+    }
+}
