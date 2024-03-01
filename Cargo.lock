@@ -1010,6 +1010,7 @@ dependencies = [
  "axum",
  "axum-test",
  "futures",
+ "pin-project",
  "tokio",
  "tower",
 ]

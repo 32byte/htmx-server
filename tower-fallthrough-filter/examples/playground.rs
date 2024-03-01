@@ -1,13 +1,14 @@
 use std::{
     convert::Infallible,
     marker::PhantomData,
+    pin::Pin,
     task::{Context, Poll},
 };
 
 use axum::{extract::Request, response::Response, routing::get, Router};
 use axum_test::TestServer;
 use futures::{
-    future::{ready, BoxFuture, Ready},
+    future::{ready, Either, Ready},
     ready, Future,
 };
 use tower::{Layer, Service};
@@ -128,7 +129,7 @@ where
 {
     type Response = Res;
     type Error = Err;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Future = MyFuture<Fut, Ser, Inn, Req, Res, Err>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         ready!(self.service.poll_ready(cx))?;
@@ -139,16 +140,90 @@ where
 
     fn call(&mut self, req: Req) -> Self::Future {
         let matches = (self.filter)(&req);
-        let mut service = self.service.clone();
-        let mut fallthrough = self.fallthrough.clone();
+        let service = self.service.clone();
+        let fallthrough = self.fallthrough.clone();
 
-        Box::pin(async move {
-            if matches.await {
-                service.call(req).await
-            } else {
-                fallthrough.call(req).await
-            }
-        })
+        MyFuture::new(matches, service, fallthrough, req)
+    }
+}
+
+#[pin_project::pin_project]
+pub struct MyFuture<Fil, Left, Right, Req, Res, Err>
+where
+    Fil: Future<Output = bool>,
+    Left: Service<Req, Response = Res, Error = Err>,
+    Right: Service<Req, Response = Res, Error = Err>,
+{
+    #[pin]
+    filter: Fil,
+
+    #[pin]
+    future: Option<Either<Left::Future, Right::Future>>,
+
+    req: Option<Req>,
+    left: Left,
+    right: Right,
+
+    _marker: PhantomData<(Res, Err)>,
+}
+
+impl<Fil, Left, Right, Req, Res, Err> MyFuture<Fil, Left, Right, Req, Res, Err>
+where
+    Fil: Future<Output = bool>,
+    Left: Service<Req, Response = Res, Error = Err>,
+    Right: Service<Req, Response = Res, Error = Err>,
+{
+    pub fn new(filter: Fil, left: Left, right: Right, req: Req) -> Self {
+        Self {
+            filter,
+            future: None,
+
+            req: Some(req),
+            left,
+            right,
+
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<Fil, Left, Right, Req, Res, Err> Future for MyFuture<Fil, Left, Right, Req, Res, Err>
+where
+    Fil: Future<Output = bool>,
+    Left: Service<Req, Response = Res, Error = Err>,
+    Right: Service<Req, Response = Res, Error = Err>,
+{
+    type Output = Result<Res, Err>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+
+        if let Some(future) = this.future.as_mut().as_pin_mut() {
+            return future.poll(cx);
+        }
+
+        let matches = ready!(this.filter.poll(cx));
+
+        let req = this.req.take().expect("Request was none!");
+
+        let _fut = if matches {
+            Either::Left(this.left.call(req))
+        } else {
+            Either::Right(this.right.call(req))
+        };
+
+        unsafe {
+            let future_ref = this.future.as_mut();
+            let future = Pin::get_unchecked_mut(future_ref);
+
+            *future = Some(_fut);
+        }
+
+        this.future
+            .as_mut()
+            .as_pin_mut()
+            .expect("I just set the future")
+            .poll(cx)
     }
 }
 
