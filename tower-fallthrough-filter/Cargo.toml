@@ -1,7 +1,7 @@
 [package]
 name = "tower-fallthrough-filter"
 description = "A Tower middleware that gives controll to a defined service if the filter matches and otherwise falls through to the inner service."
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 license = "MIT"
 authors = ["32byte <xlebedenko@gmail.com>"]
@@ -15,8 +15,19 @@ categories = ["asynchronous", "network-programming"]
 [dependencies]
 futures = "0.3.30"
 tower = "0.4.13"
+pin-project = { version = "1.1.4", optional = true }
 
 [dev-dependencies]
 axum = "0.7.4"
 axum-test = "14.3.1"
 tokio = { version = "1.36.0", features = ["full"] }
+
+[features]
+default = []
+futures = [ "dep:pin-project" ]
+async = [ "futures" ]
+
+[[example]]
+name = "axum-render-layer-async"
+path = "examples/axum-render-layer-async.rs"
+required-features = [ "async" ]

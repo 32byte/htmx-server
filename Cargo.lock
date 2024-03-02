@@ -1005,11 +1005,12 @@ dependencies = [
 
 [[package]]
 name = "tower-fallthrough-filter"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "axum",
  "axum-test",
  "futures",
+ "pin-project",
  "tokio",
  "tower",
 ]
