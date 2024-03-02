@@ -17,6 +17,8 @@ where
     #[pin]
     condition: C,
 
+    // TODO: I think I can represent this as an enum, so I don't have to
+    //       maintain the invariants myself.
     // INV: This is Some(...) when future is None
     value: Option<T>,
 
@@ -85,5 +87,37 @@ where
             .as_pin_mut()
             .expect("I just set the future :)")
             .poll(cx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::future::ready;
+
+    use super::*;
+    use crate::test_util::*;
+
+    #[tokio::test]
+    async fn should_select_first() {
+        let first = TestService("first");
+        let second = TestService("second");
+
+        let fut = SelectServiceAndCallFut::new(ready(true), "value", first, second);
+
+        let res = fut.await.unwrap();
+
+        assert_eq!(res, "first");
+    }
+
+    #[tokio::test]
+    async fn should_select_second() {
+        let first = TestService("first");
+        let second = TestService("second");
+
+        let fut = SelectServiceAndCallFut::new(ready(false), "value", first, second);
+
+        let res = fut.await.unwrap();
+
+        assert_eq!(res, "second");
     }
 }

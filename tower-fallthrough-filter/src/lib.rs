@@ -6,6 +6,9 @@ use std::{
 use ::futures::{future::Either, ready};
 use tower::{Layer, Service};
 
+#[cfg(test)]
+pub mod test_util;
+
 #[cfg(feature = "futures")]
 pub mod futures;
 
@@ -217,5 +220,37 @@ where
         } else {
             Either::Right(self.inner.call(req))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::*;
+
+    #[tokio::test]
+    async fn should_allow() {
+        let service_a = TestService("a");
+        let service_b = TestService("b");
+
+        let filter = TestFilter(true);
+        let filter_layer = FilterLayer::new(filter, service_a);
+
+        let mut middleware = filter_layer.layer(service_b);
+
+        assert_eq!(middleware.call(()).await, Ok("a"));
+    }
+
+    #[tokio::test]
+    async fn should_fall_through() {
+        let service_a = TestService("a");
+        let service_b = TestService("b");
+
+        let filter = TestFilter(false);
+        let filter_layer = FilterLayer::new(filter, service_a);
+
+        let mut middleware = filter_layer.layer(service_b);
+
+        assert_eq!(middleware.call(()).await, Ok("b"));
     }
 }

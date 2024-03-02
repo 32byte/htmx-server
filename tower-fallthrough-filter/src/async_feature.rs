@@ -165,7 +165,40 @@ where
         let matches = self.filter.matches(&req);
         let service = self.service.clone();
         let inner = self.inner.clone();
+        // TODO: std::mem::replace the services as the clone might not be ready
 
         SelectServiceAndCallFut::new(matches, req, service, inner)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::*;
+
+    #[tokio::test]
+    async fn should_allow() {
+        let service_a = TestService("a");
+        let service_b = TestService("b");
+
+        let filter = TestFilter(true);
+        let filter_layer = AsyncFilterLayer::new(filter, service_a);
+
+        let mut middleware = filter_layer.layer(service_b);
+
+        assert_eq!(middleware.call(()).await, Ok("a"));
+    }
+
+    #[tokio::test]
+    async fn should_fall_through() {
+        let service_a = TestService("a");
+        let service_b = TestService("b");
+
+        let filter = TestFilter(false);
+        let filter_layer = AsyncFilterLayer::new(filter, service_a);
+
+        let mut middleware = filter_layer.layer(service_b);
+
+        assert_eq!(middleware.call(()).await, Ok("b"));
     }
 }
