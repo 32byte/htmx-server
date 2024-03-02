@@ -154,8 +154,6 @@ where
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         ready!(self.service.poll_ready(cx))?;
-        // NOTE: It is probably best to poll the `inner_service` here as well
-        //       as otherwise it might be called when it isn't ready yet.
         ready!(self.inner.poll_ready(cx))?;
 
         Poll::Ready(Ok(()))
@@ -163,9 +161,13 @@ where
 
     fn call(&mut self, req: T) -> Self::Future {
         let matches = self.filter.matches(&req);
-        let service = self.service.clone();
-        let inner = self.inner.clone();
-        // TODO: std::mem::replace the services as the clone might not be ready
+        // https://docs.rs/tower/latest/tower/trait.Service.html#be-careful-when-cloning-inner-services
+        // As the inner service is cloned, the clone might not be ready to accept requests.
+        // So, we need to clone the inner service, and use the original one to make the call, as it is ready.
+        let clone = self.service.clone();
+        let service = std::mem::replace(&mut self.service, clone);
+        let clone = self.inner.clone();
+        let inner = std::mem::replace(&mut self.inner, clone);
 
         SelectServiceAndCallFut::new(matches, req, service, inner)
     }
