@@ -1,7 +1,7 @@
 [package]
 name = "tower-fallthrough-filter"
 description = "A Tower middleware that gives controll to a defined service if the filter matches and otherwise falls through to the inner service."
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 license = "MIT"
 authors = ["32byte <xlebedenko@gmail.com>"]
